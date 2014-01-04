@@ -1,22 +1,23 @@
+import sys
 import curses
 
 import requests
 
 
-def get_players():
-    return requests.get('http://localhost:8888/players.json').json()
+def get_players(addr):
+    return requests.get('/'.join((addr, 'players.json'))).json()
 
 
-def new_player():
+def new_player(addr, name):
     return requests.post(
-        'http://localhost:8888/players.json',
-        data={'name': 'Marek'}
+        '/'.join((addr, 'players.json')),
+        data={'name': name}
     ).json()['uid']
 
 
-def update_player(uid, y, x):
+def update_player(addr, uid, y, x):
     requests.put(
-        'http://localhost:8888/players.json',
+        '/'.join((addr, 'players.json')),
         data={
             'y': y,
             'x': x,
@@ -25,20 +26,20 @@ def update_player(uid, y, x):
     )
 
 
-def remove_player(uid):
+def remove_player(addr, uid):
     requests.delete(
-        'http://localhost:8888/players.json',
+        '/'.join((addr, 'players.json')),
         params={'uid':uid}
     )
 
 
-def main_loop(stdscr):
+def main_loop(stdscr, server, name):
     curses.curs_set(0)
     stdscr.nodelay(1)
     player_char = curses.ACS_DIAMOND
     stdscr_y, stdscr_x = stdscr.getmaxyx()
 
-    our_uid = new_player()
+    our_uid = new_player(server, name)
 
     try:
         while(True): # I know, ok?
@@ -46,7 +47,7 @@ def main_loop(stdscr):
             # Clearing screen from last "frame"
             stdscr.clear()
 
-            players = get_players()
+            players = get_players(server)
 
             for player in players['players']:
                 y = int(player['y'])
@@ -61,6 +62,7 @@ def main_loop(stdscr):
                 stdscr.addch(y, x, player_char)
                 stdscr.addstr(0,0,uid)
                 stdscr.addstr(0,0,our_uid)
+
                 # --- OUR PLAYER PART ---
                 if uid == our_uid:
 
@@ -76,13 +78,31 @@ def main_loop(stdscr):
                         x += 1
 
                     # and send movement update to server
-                    update_player(uid, y, x)
+                    update_player(server, uid, y, x)
 
             stdscr.refresh()
             curses.napms(500)
     except KeyboardInterrupt:
-        remove_player(our_uid)
+        remove_player(server, our_uid)
+        sys.exit()
 
+
+help_msg = ('\nFirst argument is server address.'
+            '\nSecond argument is your name.'
+            '\n\nFor example: ./run.py http://localhost:888 Marek'
+            '\nHave FUN!\n')
 
 if __name__ == '__main__':
-    curses.wrapper(main_loop)
+    try:
+        if 'help' in sys.argv[1] or sys.argv[1] == '-h':
+            print(help_msg)
+            sys.exit()
+        else:
+            try:
+                curses.wrapper(main_loop, sys.argv[1], sys.argv[2])
+            except requests.exceptions.ConnectionError:
+                print('\nBEEP! BEEP! Server is DEAD!\n')
+                sys.exit()
+
+    except IndexError:
+        print(help_msg)
