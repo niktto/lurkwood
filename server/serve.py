@@ -8,6 +8,7 @@ import tornado.web
 from tornado.options import define, options
 
 from players import Players
+from maps import Maps
 
 
 define("port", default=8888, help="run on the given port", type=int)
@@ -18,6 +19,7 @@ def main():
 
     application = tornado.web.Application([
         (r"/players.json", Players),
+        (r"/maps.json", Maps)
     ])
 
     http_server = tornado.httpserver.HTTPServer(application)
